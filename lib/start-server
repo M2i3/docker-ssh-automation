@@ -1,0 +1,57 @@
+#!/bin/bash
+set -e
+
+eval "$(docopts -V - -h - : "$@" <<EOF
+Usage: 
+  server --pub-id-rsa=<public-key> --user=<user> (--command=<allowed-command> ...)
+
+If missing purpose will take the value of data by default  
+
+Options:
+  --pub-id-rsa=<public-key>       Base64 encoded Public Key for the server portion
+  --user=<user>                   User allowed to connect on the server with the key
+  --command=<allowed-command>     The command the user is allowed to execute (you can specify more than one command)
+	-h --help                          Show help options.
+	--version                          Print program version.
+----
+ssh-automation server 0.0.1
+Copyright (C) 2015 M2i3.com 
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+EOF
+)"
+
+# change the root password for something totally random
+password=`base64 /dev/urandom | head -c 300 -n 1`
+#echo "new password is: $password"
+echo "root:$password" | chpasswd
+
+# make sure the user is in the user passwd file and is not allowed to connect with password
+grep $user:x /etc/passwd > /dev/null || useradd $user
+# allow bash login
+chsh -s /bin/bash $user
+# change home folder and force creating it
+homefolder=/home/$user
+mkdir $homefolder
+chown $user:$user $homefolder
+usermod -d $homefolder $user
+# change the password to make it unusable
+password=`base64 /dev/urandom | head -c 300 -n 1`
+echo "$user:$password" | chpasswd
+# set 
+mkdir -p $homefolder/.ssh
+chown -R $user:$user $homefolder/.ssh
+chmod 755 $homefolder/.ssh
+echo -n 'command="/usr/bin/run-allowed.sh",no-port-forwarding,no-X11-forwarding,no-pty ' > $homefolder/.ssh/authorized_keys 
+echo -n $pub_id_rsa | base64 -d >> $homefolder/.ssh/authorized_keys 
+
+for cmd in "${command[@]}"
+do
+	echo "command is: $cmd"
+  echo $cmd >> $homefolder/.ssh/allowed_commands
+done
+echo "user is: $user"
+echo "public-key is: $pub_id_rsa"
+echo "awaiting allowed commands"
+
+/usr/sbin/sshd -D

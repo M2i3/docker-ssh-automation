@@ -1,0 +1,73 @@
+#!/bin/bash
+set -e
+
+declare -A ALLOWED_COMMANDS
+for CONSTANT in client server
+do
+    ALLOWED_COMMANDS[$CONSTANT]=1
+done
+
+COMMAND="${1:-help}"
+if [[ ${ALLOWED_COMMANDS[$COMMAND]} ]]; then 
+  "start-${@}"
+else
+  cat<<EOF 
+  The following commands are available:
+    client
+    server 
+    
+    Add --help after the command for 
+EOF
+fi    
+
+exit 0
+
+case "${1:-help}" in
+  help)
+    echo ""
+    echo "The following commands are available:"
+    cat<<EOF 
+    client ::: Start the client using the ID_RSA, CONNECTING_USER and COMMAND variables
+    server ::: Start the server using the PUB_ID_RSA, CONNECTING_USER and COMMAND variables
+    help  :::  Print the list of commands
+    plugins  :::  Print active plugins
+EOF
+    echo ""
+    ;;
+
+  client)
+    echo "running the client"
+    ;;
+    
+  server)
+    echo "running the server"
+    ;;
+
+  *)
+  echo ""
+  echo "invalid command. type help to get the list of commands."
+  echo ""
+    ;;
+
+esac
+
+
+exit 0
+
+VOLUMES=""
+for vol in "${volume[@]}"
+do
+	:
+	VOLUMES=$VOLUMES" -v "$vol
+done
+
+CONTAINER=$name"_"${purpose:-data}
+
+echo $VOLUMES
+
+JOB=$(docker run -d --name $CONTAINER \
+  $VOLUMES \
+  --net=none \
+  tianon/true:latest)
+
+echo data container $CONTAINER with ID $JOB created for $VOLUMES

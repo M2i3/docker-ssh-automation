@@ -1,0 +1,47 @@
+#!/bin/bash
+set -e
+
+eval "$(docopts -V - -h - : "$@" <<EOF
+Usage: 
+  client --id-rsa=<private-key> --user=<user> --command=<run-command>
+
+If missing purpose will take the value of data by default  
+
+Options:
+  --id-rsa=<private-key>          Base64 encoded Private Key for the client portion
+  --user=<user>                   User that will run the command
+  --command=<run-command>         The command to be run as the user
+	-h --help                       Show help options.
+	--version                       Print program version.
+----
+ssh-automation client 0.0.1
+Copyright (C) 2015 M2i3.com 
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+EOF
+)"
+
+# make sure the user is in the user passwd file and is not allowed to connect with password
+grep $user:x /etc/passwd > /dev/null || useradd $user
+# allow bash login
+chsh -s /bin/bash $user
+# change home folder and force creating it
+homefolder=/home/$user
+usermod -m -d $homefolder $user
+mkhomedir_helper $user
+# change the password to make it unusable
+password=`base64 /dev/urandom | head -c 300 -n 1`
+echo "$user:$password" | chpasswd
+# set 
+mkdir $homefolder/.ssh
+echo $id_rsa | base64 -d > $homefolder/.ssh/id_rsa
+chown -R $user:$user $homefolder/.ssh
+chmod 755 $homefolder/.ssh
+chmod 600 $homefolder/.ssh/id_rsa
+
+
+echo "command is: $command"
+echo "user is: $user"
+echo "private-key is: $id_rsa"
+
+su $user -c "$command"
